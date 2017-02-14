@@ -95,7 +95,7 @@ require('mongoose-cache').install(mongoose, cacheOpts);
 var mongoUri = 'mongodb://' +
 ((config.mongodb.user && config.mongodb.user.length > 0) ?
   config.mongodb.user + ':' + config.mongodb.password + '@' : "");
-  
+
 for (host in config.mongodb.hosts) {
     mongoUri += config.mongodb.hosts[host];
     if (host < config.mongodb.hosts.length - 1) {
@@ -583,7 +583,7 @@ function proxyRouteOpenhab(req, res) {
         requestPath = requestPath.replace('/remote', '');
         // TODO: this is too dirty :-(
         delete requestHeaders['host'];
-        requestHeaders['host'] = "home.openhab.org:443";
+        requestHeaders['host'] = "home." + config.system.baseurl;
     }
     // console.log(requestPath);
     // Send a message with request to openhab agent module
@@ -598,6 +598,13 @@ function proxyRouteOpenhab(req, res) {
     	// console.log("Request " + requestId + " was closed before serving");
         io.sockets.in(req.openhab.uuid).emit('cancel', {id:requestId});
     });
+
+    //this will get called when the response is finished and is the only function
+    //responsible for removing response objects from this map.
+    res.on('finish', function() {
+        delete restRequests[requestId];
+    });
+
 }
 
 function addAppleRegistration(req, res) {
@@ -944,7 +951,7 @@ io.sockets.on('connection',function(socket){
      */
 
     socket.on('response', function(data) {
-        self = this;
+        var self = this;
         var requestId = data.id;
         if (restRequests[requestId] != null) {
             if (self.handshake.uuid == restRequests[requestId].openhab.uuid) {
@@ -958,7 +965,6 @@ io.sockets.on('connection',function(socket){
                     }
                     restRequests[requestId].send(data.responseStatusCode, new Buffer(data.body, 'base64'));
                 }
-                delete restRequests[requestId];
             } else {
                 logger.warn("openHAB-cloud: " + self.handshake.uuid + " tried to respond to request which it doesn't own");
             }
@@ -967,7 +973,7 @@ io.sockets.on('connection',function(socket){
         }
     });
     socket.on('responseHeader', function(data) {
-        self = this;
+        var self = this;
         var requestId = data.id;
         if (restRequests[requestId] != null) {
             if (self.handshake.uuid == restRequests[requestId].openhab.uuid && !restRequests[requestId].headersSent) {
@@ -982,7 +988,7 @@ io.sockets.on('connection',function(socket){
     });
     // This is a method for old versions of openHAB-cloud bundle which use base64 encoding for binary
     socket.on('responseContent', function(data) {
-        self = this;
+        var self = this;
         var requestId = data.id;
         if (restRequests[requestId] != null) {
             if (self.handshake.uuid == restRequests[requestId].openhab.uuid) {
@@ -997,7 +1003,7 @@ io.sockets.on('connection',function(socket){
     });
     // This is a method for new versions of openHAB-cloud bundle which use bindary encoding
     socket.on('responseContentBinary', function(data) {
-        self = this;
+        var self = this;
         var requestId = data.id;
         if (restRequests[requestId] != null) {
             if (self.handshake.uuid == restRequests[requestId].openhab.uuid) {
@@ -1010,26 +1016,24 @@ io.sockets.on('connection',function(socket){
         }
     });
     socket.on('responseFinished', function(data) {
-        self = this;
+        var self = this;
         var requestId = data.id;
         if (restRequests[requestId] != null) {
             if (self.handshake.uuid == restRequests[requestId].openhab.uuid) {
             	// self.to(self.handshake.uuid).emit('responseFinished', data);
                 restRequests[requestId].end();
-                delete restRequests[requestId];
             } else {
                 logger.warn("openHAB-cloud: " + self.handshake.uuid + " tried to respond to request which it doesn't own");
             }
         }
     });
     socket.on('responseError', function(data) {
-        self = this;
+        var self = this;
         var requestId = data.id;
         if (restRequests[requestId] != null) {
             if (self.handshake.uuid == restRequests[requestId].openhab.uuid) {
             	// self.to(self.handshake.uuid).emit('responseError', data);
                 restRequests[requestId].send(500, data.responseStatusText);
-                delete restRequests[requestId];
             } else {
                 logger.warn("openHAB-cloud: " + self.handshake.uuid + " tried to respond to request which it doesn't own");
             }
@@ -1067,7 +1071,7 @@ io.sockets.on('connection',function(socket){
         });
     });
     socket.on('broadcastnotification', function(data) {
-        self = this;
+        var self = this;
         Openhab.findById(self.openhabId, function(error, openhab) {
             if (!error && openhab) {
             	// self.to(self.handshake.uuid).emit('broadcastnotification', data);
@@ -1094,7 +1098,7 @@ io.sockets.on('connection',function(socket){
         });
     });
     socket.on('lognotification', function(data) {
-        self = this;
+        var self = this;
         Openhab.findById(self.openhabId, function(error, openhab) {
             if (!error && openhab) {
 //                self.to(self.handshake.uuid).emit('lognotification', data);
